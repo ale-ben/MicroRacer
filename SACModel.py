@@ -38,8 +38,8 @@ class SAC(Base_model):
         self.upper_bound = 1
         self.lower_bound = -1
 
-        buffer_dim = 50000
-        batch_size = 64
+        self.buffer_dim = 50000
+        self.batch_size = 64
 
         print(
             "State Space dim: {}, Action Space dim: {}".format(
@@ -182,11 +182,11 @@ class SAC(Base_model):
 
     # Slowly updating target parameters according to the tau rate <<1
     @tf.function
-    def update_target(target_weights, weights, tau):
+    def update_target(self, target_weights, weights, tau):
         for (a, b) in zip(target_weights, weights):
             a.assign(b * tau + a * (1 - tau))
 
-    def update_weights(target_weights, weights, tau):
+    def update_weights(self, target_weights, weights, tau):
         return target_weights * (1 - tau) + weights * tau
 
     # We introduce a probability of doing n empty actions to separate the environment time-step from the agent
@@ -203,100 +203,100 @@ class SAC(Base_model):
         return (state, reward, done)
 
     @tf.function
-    def update_critics(states, actions, rewards, dones, newstates):
-        entropy_scale = tf.convert_to_tensor(alpha)
-        _, new_policy_actions, log_probs = actor_model(newstates)
-        q1_t = target_critic([newstates, new_policy_actions])
-        q2_t = target_critic2([newstates, new_policy_actions])
+    def update_critics(self, states, actions, rewards, dones, newstates):
+        entropy_scale = tf.convert_to_tensor(self.alpha)
+        _, new_policy_actions, log_probs = self.actor_model(newstates)
+        q1_t = self.target_critic([newstates, new_policy_actions])
+        q2_t = self.target_critic2([newstates, new_policy_actions])
         tcritic_v = tf.reduce_min([q1_t, q2_t], axis=0)
         newvalue = tcritic_v - entropy_scale * log_probs
-        q_hat = tf.stop_gradient(rewards + gamma * newvalue * (1 - dones))
+        q_hat = tf.stop_gradient(rewards + self.gamma * newvalue * (1 - dones))
         with tf.GradientTape(persistent=True) as tape1:
-            q1 = critic_model([states, actions])
-            q2 = critic2_model([states, actions])
+            q1 = self.critic_model([states, actions])
+            q2 = self.critic2_model([states, actions])
             loss_c1 = tf.reduce_mean((q1 - q_hat) ** 2)
             loss_c2 = tf.reduce_mean((q2 - q_hat) ** 2)
-        critic1_gradient = tape1.gradient(loss_c1, critic_model.trainable_variables)
-        critic2_gradient = tape1.gradient(loss_c2, critic2_model.trainable_variables)
-        critic_model.optimizer.apply_gradients(
-            zip(critic1_gradient, critic_model.trainable_variables)
+        critic1_gradient = tape1.gradient(loss_c1, self.critic_model.trainable_variables)
+        critic2_gradient = tape1.gradient(loss_c2, self.critic2_model.trainable_variables)
+        self.critic_model.optimizer.apply_gradients(
+            zip(critic1_gradient, self.critic_model.trainable_variables)
         )
-        critic2_model.optimizer.apply_gradients(
-            zip(critic2_gradient, critic2_model.trainable_variables)
+        self.critic2_model.optimizer.apply_gradients(
+            zip(critic2_gradient, self.critic2_model.trainable_variables)
         )
 
     @tf.function
-    def update_actor(states):
-        entropy_scale = tf.convert_to_tensor(alpha)
+    def update_actor(self, states):
+        entropy_scale = tf.convert_to_tensor(self.alpha)
         with tf.GradientTape(watch_accessed_variables=False) as tape:
-            tape.watch(actor_model.trainable_variables)
-            _, new_policy_actions, log_probs = actor_model(states)
-            q1_n = critic_model([states, new_policy_actions])
-            q2_n = critic2_model([states, new_policy_actions])
+            tape.watch(self.actor_model.trainable_variables)
+            _, new_policy_actions, log_probs = self.actor_model(states)
+            q1_n = self.critic_model([states, new_policy_actions])
+            q2_n = self.critic2_model([states, new_policy_actions])
             critic_v = tf.reduce_min([q1_n, q2_n], axis=0)
             actor_loss = critic_v - entropy_scale * log_probs
             actor_loss = -tf.reduce_mean(actor_loss)
-        actor_gradient = tape.gradient(actor_loss, actor_model.trainable_variables)
-        actor_model.optimizer.apply_gradients(
-            zip(actor_gradient, actor_model.trainable_variables)
+        actor_gradient = tape.gradient(actor_loss, self.actor_model.trainable_variables)
+        self.actor_model.optimizer.apply_gradients(
+            zip(actor_gradient, self.actor_model.trainable_variables)
         )
 
     @tf.function
-    def update_entropy(states):
-        _, _, log_probs = actor_model(states)
+    def update_entropy(self, states):
+        _, _, log_probs = self.actor_model(states)
         with tf.GradientTape() as tape:
             alpha_loss = tf.reduce_mean(
-                -alpha * tf.stop_gradient(log_probs + target_entropy)
+                -self.alpha * tf.stop_gradient(log_probs + self.target_entropy)
             )
-        alpha_grad = tape.gradient(alpha_loss, [log_alpha])
-        alpha_optimizer.apply_gradients(zip(alpha_grad, [log_alpha]))
+        alpha_grad = tape.gradient(alpha_loss, [self.log_alpha])
+        self.alpha_optimizer.apply_gradients(zip(alpha_grad, [self.log_alpha]))
 
-    def train(self, total_iterations=None, load_weights=True, save_weights=True):
+    def train(self, total_iterations=None, load_weights=True, save_weights=True, save_file=None):
         if total_iterations is None:
             total_iterations = self.total_iterations
 
-        critic_model = self.Get_critic()
-        critic2_model = self.Get_critic()
+        self.critic_model = self.Get_critic()
+        self.critic2_model = self.Get_critic()
 
         # we create the target model for double learning (to prevent a moving target phenomenon)
-        target_critic = self.Get_critic()
-        target_critic2 = self.Get_critic()
-        target_critic.trainable = False
-        target_critic2.trainable = False
+        self.target_critic = self.Get_critic()
+        self.target_critic2 = self.Get_critic()
+        self.target_critic.trainable = False
+        self.target_critic2.trainable = False
 
         ## TRAINING ##
         if load_weights:
-            target_critic(
+            self.target_critic(
                 [
                     layers.Input(shape=(self.num_states)),
                     layers.Input(shape=(self.num_actions)),
                 ]
             )
-            target_critic2(
+            self.target_critic2(
                 [
                     layers.Input(shape=(self.num_states)),
                     layers.Input(shape=(self.num_actions)),
                 ]
             )
-            critic_model = keras.models.load_model(self.weights_file_critic)
-            critic2_model = keras.models.load_model(self.weights_file_critic2)
+            self.critic_model = keras.models.load_model(self.weights_file_critic)
+            self.critic2_model = keras.models.load_model(self.weights_file_critic2)
 
         # Making the weights equal initially
-        target_critic_weights = critic_model.get_weights()
-        target_critic2_weights = critic2_model.get_weights()
-        target_critic.set_weights(target_critic_weights)
-        target_critic2.set_weights(target_critic2_weights)
+        target_critic_weights = self.critic_model.get_weights()
+        target_critic2_weights = self.critic2_model.get_weights()
+        self.target_critic.set_weights(target_critic_weights)
+        self.target_critic2.set_weights(target_critic2_weights)
 
         actor_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
         critic_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
         critic2_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
-        alpha_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+        self.alpha_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
 
-        critic_model.compile(optimizer=critic_optimizer)
-        critic2_model.compile(optimizer=critic2_optimizer)
+        self.critic_model.compile(optimizer=critic_optimizer)
+        self.critic2_model.compile(optimizer=critic2_optimizer)
         self.actor_model.compile(optimizer=actor_optimizer)
 
-        buffer = self.Buffer(self, buffer_dim, batch_size)
+        buffer = self.Buffer(self, self.buffer_dim, self.batch_size)
 
         # History of rewards per episode
         ep_reward_list = []
@@ -321,8 +321,8 @@ class SAC(Base_model):
                 i = i + 1
 
                 tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
-                _, action, _ = actor_model(tf_prev_state)
-                state, reward, done = step(action)
+                _, action, _ = self.actor_model(tf_prev_state)
+                state, reward, done = self.step(action)
 
                 # we distinguish between termination with failure (state = None) and succesfull termination on track completion
                 # succesfull termination is stored as a normal tuple
@@ -333,7 +333,7 @@ class SAC(Base_model):
 
                 episodic_reward += reward
 
-                if buffer.buffer_counter > batch_size:
+                if buffer.buffer_counter > self.batch_size:
                     states, actions, rewards, dones, newstates = buffer.sample_batch()
                     states = tf.stack(tf.convert_to_tensor(states, dtype=tf.float32))
                     actions = tf.stack(tf.convert_to_tensor(actions, dtype=tf.float32))
@@ -343,12 +343,12 @@ class SAC(Base_model):
                         tf.convert_to_tensor(newstates, dtype=tf.float32)
                     )
 
-                    update_critics(states, actions, rewards, dones, newstates)
-                    update_actor(states)
-                    update_entropy(states)
-                    update_target(target_critic.variables, critic_model.variables, tau)
-                    update_target(
-                        target_critic2.variables, critic2_model.variables, tau
+                    self.update_critics(states, actions, rewards, dones, newstates)
+                    self.update_actor(states)
+                    self.update_entropy(states)
+                    self.update_target(self.target_critic.variables, self.critic_model.variables, self.tau)
+                    self.update_target(
+                        self.target_critic2.variables, self.critic2_model.variables, self.tau
                     )
 
                 prev_state = state
@@ -369,14 +369,18 @@ class SAC(Base_model):
 
             if ep > 0 and ep % 40 == 0:
                 print("## Evaluating policy ##")
-                tracks.metrics_run(actor_model, 10)
+                tracks.metrics_run(self.actor_model, 10)
             ep += 1
 
         if total_iterations > 0:
             if save_weights:
-                critic_model.save(self.weights_file_critic)
-                critic2_model.save(self.weights_file_critic2)
-                actor_model.save(self.weights_file_actor)
+                if save_file is not None:
+                    self.weights_file_actor = f"weights/{save_file}_actor_model_car"
+                    self.weights_file_critic = f"weights/{save_file}_critic_model_car"
+                    self.weights_file_critic2 = f"weights/{save_file}_critic2_model_car"
+                self.critic_model.save(self.weights_file_critic)
+                self.critic2_model.save(self.weights_file_critic2)
+                self.actor_model.save(self.weights_file_actor)
             # Plotting Episodes versus Avg. Rewards
             plt.plot(avg_reward_list)
             plt.xlabel("Training steps x100")
@@ -389,3 +393,7 @@ class SAC(Base_model):
 
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
+
+if __name__ == "__main__":
+    car = SAC()
+    car.train(total_iterations=50, save_file="custom_sac")
