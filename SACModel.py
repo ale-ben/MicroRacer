@@ -30,80 +30,37 @@ class SAC(Base_model):
 
         self.num_states = 5  # we reduce the state dim through observation (see below)
         self.num_actions = 2  # acceleration and steering
+
+        self.weights_file_actor = "weights/sac_actor_model_car"
+        self.weights_file_critic = "weights/sac_critic_model_car"
+        self.weights_file_critic2 = "weights/sac_critic2_model_car"
+
+        self.upper_bound = 1
+        self.lower_bound = -1
+
+        buffer_dim = 50000
+        batch_size = 64
+
         print(
             "State Space dim: {}, Action Space dim: {}".format(
                 self.num_states, self.num_actions
             )
         )
 
-        self.upper_bound = 1
-        self.lower_bound = -1
         print(
             "Min and Max Value of Action: {}".format(self.lower_bound, self.upper_bound)
-        )
-
-        buffer_dim = 50000
-        batch_size = 64
+        )        
 
         # Adaptive Entropy to maximize exploration
         self.target_entropy = -tf.constant(self.num_actions, dtype=tf.float32)
         self.log_alpha = tf.Variable(0.0, dtype=tf.float32)
         self.alpha = tfp.util.DeferredTensor(self.log_alpha, tf.exp)
 
-        self.weights_file_actor = "weights/sac_actor_model_car"
-        self.weights_file_critic = "weights/sac_critic_model_car"
-        self.weights_file_critic2 = "weights/sac_critic2_model_car"
-
         # creating models
         self.actor_model = self.Get_actor(self)
-        critic_model = self.Get_critic()
-        critic2_model = self.Get_critic()
 
-        # we create the target model for double learning (to prevent a moving target phenomenon)
-        target_critic = self.Get_critic()
-        target_critic2 = self.Get_critic()
-        target_critic.trainable = False
-        target_critic2.trainable = False
-
-        ## TRAINING ##
         if load_weights:
-            target_critic(
-                [
-                    layers.Input(shape=(self.num_states)),
-                    layers.Input(shape=(self.num_actions)),
-                ]
-            )
-            target_critic2(
-                [
-                    layers.Input(shape=(self.num_states)),
-                    layers.Input(shape=(self.num_actions)),
-                ]
-            )
-            critic_model = keras.models.load_model(self.weights_file_critic)
-            critic2_model = keras.models.load_model(self.weights_file_critic2)
             self.actor_model = keras.models.load_model(self.weights_file_actor)
-
-        # Making the weights equal initially
-        target_critic_weights = critic_model.get_weights()
-        target_critic2_weights = critic2_model.get_weights()
-        target_critic.set_weights(target_critic_weights)
-        target_critic2.set_weights(target_critic2_weights)
-
-        actor_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
-        critic_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
-        critic2_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
-        alpha_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
-
-        critic_model.compile(optimizer=critic_optimizer)
-        critic2_model.compile(optimizer=critic2_optimizer)
-        self.actor_model.compile(optimizer=actor_optimizer)
-
-        buffer = self.Buffer(self, buffer_dim, batch_size)
-
-        # History of rewards per episode
-        ep_reward_list = []
-        # Average reward history of last few episodes
-        avg_reward_list = []
 
     # The actor choose the move, given the state
     class Get_actor(tf.keras.Model):
@@ -237,10 +194,10 @@ class SAC(Base_model):
         n = 1
         t = np.random.randint(0, n)
         action = tf.squeeze(action)
-        state, reward, done = racer.step(action)
+        state, reward, done = self.racer.step(action)
         for i in range(t):
             if not done:
-                state, t_r, done = racer.step([0, 0])
+                state, t_r, done = self.racer.step([0, 0])
                 # state ,t_r, done =racer.step(action)
                 reward += t_r
         return (state, reward, done)
@@ -294,11 +251,60 @@ class SAC(Base_model):
         alpha_grad = tape.gradient(alpha_loss, [log_alpha])
         alpha_optimizer.apply_gradients(zip(alpha_grad, [log_alpha]))
 
-    def train(self, total_iterations=None, save_weights=True):
-        start_t = datetime.now()
-
+    def train(self, total_iterations=None, load_weights=True, save_weights=True):
         if total_iterations is None:
             total_iterations = self.total_iterations
+
+        critic_model = self.Get_critic()
+        critic2_model = self.Get_critic()
+
+        # we create the target model for double learning (to prevent a moving target phenomenon)
+        target_critic = self.Get_critic()
+        target_critic2 = self.Get_critic()
+        target_critic.trainable = False
+        target_critic2.trainable = False
+
+         ## TRAINING ##
+        if load_weights:
+            target_critic(
+                [
+                    layers.Input(shape=(self.num_states)),
+                    layers.Input(shape=(self.num_actions)),
+                ]
+            )
+            target_critic2(
+                [
+                    layers.Input(shape=(self.num_states)),
+                    layers.Input(shape=(self.num_actions)),
+                ]
+            )
+            critic_model = keras.models.load_model(self.weights_file_critic)
+            critic2_model = keras.models.load_model(self.weights_file_critic2)
+    
+        # Making the weights equal initially
+        target_critic_weights = critic_model.get_weights()
+        target_critic2_weights = critic2_model.get_weights()
+        target_critic.set_weights(target_critic_weights)
+        target_critic2.set_weights(target_critic2_weights)
+
+        actor_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+        critic_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+        critic2_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+        alpha_optimizer = tf.keras.optimizers.Adam(self.learning_rate)
+
+        critic_model.compile(optimizer=critic_optimizer)
+        critic2_model.compile(optimizer=critic2_optimizer)
+        self.actor_model.compile(optimizer=actor_optimizer)
+
+        buffer = self.Buffer(self, buffer_dim, batch_size)
+
+        # History of rewards per episode
+        ep_reward_list = []
+        # Average reward history of last few episodes
+        avg_reward_list = []
+
+        #### TRAINING ####
+        start_t = datetime.now()
 
         i = 0
         mean_speed = 0
@@ -306,7 +312,7 @@ class SAC(Base_model):
         avg_reward = 0
         while i < total_iterations:
 
-            prev_state = racer.reset()
+            prev_state = self.racer.reset()
             episodic_reward = 0
             mean_speed += prev_state[4]
             done = False
