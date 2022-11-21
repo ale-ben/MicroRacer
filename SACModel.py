@@ -387,7 +387,7 @@ class SAC(Base_model):
             plt.ylabel("Avg. Episodic Reward")
             plt.ylim(-3.5, 7)
             plt.show(block=False)
-            plt.pause(0.001)
+            plt.pause(10)
             print("### SAC Training ended ###")
             print("Trained over {} steps".format(i))
 
@@ -395,5 +395,5 @@ class SAC(Base_model):
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
 
 if __name__ == "__main__":
-    car = SAC()
-    car.train(total_iterations=50, save_file="custom_sac")
+    car = SAC(model_name="custom_sac")
+    car.train()

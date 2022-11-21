@@ -424,8 +424,7 @@ class Racer:
             reward = -3
             state = None
         return(observe(state),reward,True)
-    
-    
+      
 
 def pilot(actor, state, i):
     verbose = False
