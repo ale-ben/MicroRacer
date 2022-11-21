@@ -49,7 +49,7 @@ class SAC(Base_model):
 
         print(
             "Min and Max Value of Action: {}".format(self.lower_bound, self.upper_bound)
-        )        
+        )
 
         # Adaptive Entropy to maximize exploration
         self.target_entropy = -tf.constant(self.num_actions, dtype=tf.float32)
@@ -264,7 +264,7 @@ class SAC(Base_model):
         target_critic.trainable = False
         target_critic2.trainable = False
 
-         ## TRAINING ##
+        ## TRAINING ##
         if load_weights:
             target_critic(
                 [
@@ -280,7 +280,7 @@ class SAC(Base_model):
             )
             critic_model = keras.models.load_model(self.weights_file_critic)
             critic2_model = keras.models.load_model(self.weights_file_critic2)
-    
+
         # Making the weights equal initially
         target_critic_weights = critic_model.get_weights()
         target_critic2_weights = critic2_model.get_weights()
@@ -389,8 +389,3 @@ class SAC(Base_model):
 
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
-
-
-sac = SAC()
-
-tracks.newrun([sac.actor_model])
