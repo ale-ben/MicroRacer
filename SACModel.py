@@ -11,7 +11,7 @@ from Base_model import Base_model
 
 
 class SAC(Base_model):
-    def __init__(self, load_weights=True):
+    def __init__(self, load_weights=True, model_name="sac"):
         super().__init__()
 
         self.racer = tracks.Racer()
@@ -31,9 +31,9 @@ class SAC(Base_model):
         self.num_states = 5  # we reduce the state dim through observation (see below)
         self.num_actions = 2  # acceleration and steering
 
-        self.weights_file_actor = "weights/sac_actor_model_car"
-        self.weights_file_critic = "weights/sac_critic_model_car"
-        self.weights_file_critic2 = "weights/sac_critic2_model_car"
+        self.weights_file_actor = f"weights/{model_name}_actor_model_car"
+        self.weights_file_critic = f"weights/{model_name}_critic_model_car"
+        self.weights_file_critic2 = f"weights/{model_name}_critic2_model_car"
 
         self.upper_bound = 1
         self.lower_bound = -1
