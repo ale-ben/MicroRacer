@@ -3,4 +3,4 @@ class Base_model:
         pass
 
     def get_actor_model(self):
-        pass
+        return self.actor_model
