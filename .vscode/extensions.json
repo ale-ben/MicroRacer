@@ -1,0 +1,11 @@
+{
+	"recommendations": [
+		"ms-python.python",
+		"njpwerner.autodocstring",
+		"ms-python.isort",
+		"graykode.ai-docstring",
+		"github.vscode-pull-request-github",
+		"donjayamanne.python-environment-manager",
+		"glavin001.unibeautify-vscode"
+	]
+}
