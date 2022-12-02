@@ -11,7 +11,7 @@ import tracks
 from Base_model import Base_model
 
 class PPO(Base_model):
-    def __init__(self):
+    def __init__(self, load_weights=True, model_name="PPO", weight_path="../weights"):
         super().__init__()
 
         self.num_states = 5 
@@ -25,8 +25,6 @@ class PPO(Base_model):
         self.critic_lr = 3e-4
         self.actor_lr = 3e-4
 
-        # Number of episodes
-        self.total_iterations = 600
         # Mini-batch size for training
         self.batch_size = 64
         # Number of training steps with the same episode
@@ -40,13 +38,8 @@ class PPO(Base_model):
 
         self.target_kl = 0.01
 
-        self.is_training = False
-
-        self.load_weights = True
-        self.save_weights = False
-
-        self.weights_file_actor = "../weights/baseline_weights/ppo_actor_model_car"
-        self.weights_file_critic = "../weights/baseline_weights/ppo_critic_model_car"
+        self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
+        self.weights_file_critic = f"{weight_path}/{model_name}_critic_model_car"
 
         self.racer = tracks.Racer()
         self.actor_model = self.Get_actor(self)
@@ -55,7 +48,7 @@ class PPO(Base_model):
         ## TRAINING ##
         self.critic_model(layers.Input(shape=(self.num_states)))
         self.actor_model(layers.Input(shape=(self.num_states)))
-        if self.load_weights:
+        if load_weights:
             self.critic_model = keras.models.load_model(self.weights_file_critic)
             self.actor_model = keras.models.load_model(self.weights_file_actor)
         self.actor_optimizer = tf.keras.optimizers.Adam(self.actor_lr)
@@ -230,7 +223,7 @@ class PPO(Base_model):
                 reward+=t_r
         return (state, reward, done)
           
-    def train(self):
+    def train(self, total_iterations=600, load_weights=True, save_weights=True, save_name=None):
         i = 0
         mean_speed = 0
         for ep in range(total_iterations):
@@ -264,6 +257,9 @@ class PPO(Base_model):
 
         if total_iterations > 0:
             if save_weights:
+                if save_name is not None:
+                    self.weights_file_actor = f"{weight_path}/{save_name}_actor_model_car"
+                    self.weights_file_critic = f"{weight_path}/{save_name}_critic_model_car"
                 self.critic_model.save(weights_file_critic)
                 self.actor_model.save(weights_file_actor)
             # Plotting Episodes versus Avg. Rewards
@@ -272,15 +268,9 @@ class PPO(Base_model):
             plt.ylabel("Avg. Episodic Reward")
             plt.ylim(-3.5,7)
             plt.show(block=False)
-            plt.pause(0.001)
+            plt.pause(10)
         print("### PPO Training ended ###")				
 
 if __name__ == "__main__":
-    # if is_training:
-    # 	start_t = datetime.now()
-    # 	self.train()
-    # 	end_t = datetime.now()
-    # 	print("Time elapsed: {}".format(end_t-start_t))
-
-    car = PPO()
-    tracks.newrun([car.actor_model])
+    car = PPO(weight_path="../weights/baseline_weights")
+    car.train()

@@ -1,7 +1,8 @@
 import tracks
 from SAC_model import SAC
+from PPO_model import PPO
 
-cars = [SAC(model_name="baseline_weights/sac"), SAC()]
+cars = [SAC(), PPO(weight_path="../weights/baseline_weights")]
 
 cars_models = [model.get_actor_model() for model in cars]
 
