@@ -1,8 +1,5 @@
 import tracks
-from SACModel import SAC
-
-sac_base = SAC()
-sac_trained = SAC()
+from SAC_model import SAC
 
 cars = [SAC(model_name="baseline_weights/sac"), SAC()]
 

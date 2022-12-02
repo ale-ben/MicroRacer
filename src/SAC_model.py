@@ -31,9 +31,9 @@ class SAC(Base_model):
         self.num_states = 5  # we reduce the state dim through observation (see below)
         self.num_actions = 2  # acceleration and steering
 
-        self.weights_file_actor = f"weights/{model_name}_actor_model_car"
-        self.weights_file_critic = f"weights/{model_name}_critic_model_car"
-        self.weights_file_critic2 = f"weights/{model_name}_critic2_model_car"
+        self.weights_file_actor = f"../weights/{model_name}_actor_model_car"
+        self.weights_file_critic = f"../weights/{model_name}_critic_model_car"
+        self.weights_file_critic2 = f"../weights/{model_name}_critic2_model_car"
 
         self.upper_bound = 1
         self.lower_bound = -1
@@ -375,9 +375,9 @@ class SAC(Base_model):
         if total_iterations > 0:
             if save_weights:
                 if save_file is not None:
-                    self.weights_file_actor = f"weights/{save_file}_actor_model_car"
-                    self.weights_file_critic = f"weights/{save_file}_critic_model_car"
-                    self.weights_file_critic2 = f"weights/{save_file}_critic2_model_car"
+                    self.weights_file_actor = f"../weights/{save_file}_actor_model_car"
+                    self.weights_file_critic = f"../weights/{save_file}_critic_model_car"
+                    self.weights_file_critic2 = f"../weights/{save_file}_critic2_model_car"
                 self.critic_model.save(self.weights_file_critic)
                 self.critic2_model.save(self.weights_file_critic2)
                 self.actor_model.save(self.weights_file_actor)
