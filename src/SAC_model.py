@@ -11,7 +11,7 @@ from Base_model import Base_model
 
 
 class SAC(Base_model):
-    def __init__(self, load_weights=True, model_name="sac"):
+    def __init__(self, load_weights=True, model_name="sac", weight_path="../weights"):
         super().__init__()
 
         self.racer = tracks.Racer()
@@ -19,7 +19,6 @@ class SAC(Base_model):
         ########################################
         ###### HYPERPARAMETERS #################
 
-        self.total_iterations = 50000
         # Discount factor
         # gamma = tf.constant(0.99, dtype=tf.float32)
         self.gamma = 0.99
@@ -31,9 +30,9 @@ class SAC(Base_model):
         self.num_states = 5  # we reduce the state dim through observation (see below)
         self.num_actions = 2  # acceleration and steering
 
-        self.weights_file_actor = f"../weights/{model_name}_actor_model_car"
-        self.weights_file_critic = f"../weights/{model_name}_critic_model_car"
-        self.weights_file_critic2 = f"../weights/{model_name}_critic2_model_car"
+        self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
+        self.weights_file_critic = f"{weight_path}/{model_name}_critic_model_car"
+        self.weights_file_critic2 = f"{weight_path}/{model_name}_critic2_model_car"
 
         self.upper_bound = 1
         self.lower_bound = -1
@@ -251,9 +250,7 @@ class SAC(Base_model):
         alpha_grad = tape.gradient(alpha_loss, [self.log_alpha])
         self.alpha_optimizer.apply_gradients(zip(alpha_grad, [self.log_alpha]))
 
-    def train(self, total_iterations=None, load_weights=True, save_weights=True, save_file=None):
-        if total_iterations is None:
-            total_iterations = self.total_iterations
+    def train(self, total_iterations=50000, load_weights=True, save_weights=True, save_name=None, plot_results=True):
 
         self.critic_model = self.Get_critic()
         self.critic2_model = self.Get_critic()
@@ -374,20 +371,23 @@ class SAC(Base_model):
 
         if total_iterations > 0:
             if save_weights:
-                if save_file is not None:
-                    self.weights_file_actor = f"../weights/{save_file}_actor_model_car"
-                    self.weights_file_critic = f"../weights/{save_file}_critic_model_car"
-                    self.weights_file_critic2 = f"../weights/{save_file}_critic2_model_car"
+                if save_name is not None:
+                    self.weights_file_actor = f"{weight_path}/{save_name}_actor_model_car"
+                    self.weights_file_critic = f"{weight_path}/{save_name}_critic_model_car"
+                    self.weights_file_critic2 = f"{weight_path}/{save_name}_critic2_model_car"
                 self.critic_model.save(self.weights_file_critic)
                 self.critic2_model.save(self.weights_file_critic2)
                 self.actor_model.save(self.weights_file_actor)
-            # Plotting Episodes versus Avg. Rewards
-            plt.plot(avg_reward_list)
-            plt.xlabel("Training steps x100")
-            plt.ylabel("Avg. Episodic Reward")
-            plt.ylim(-3.5, 7)
-            plt.show(block=False)
-            plt.pause(10)
+
+            if plot_results:
+                # Plotting Episodes versus Avg. Rewards
+                plt.plot(avg_reward_list)
+                plt.xlabel("Training steps x100")
+                plt.ylabel("Avg. Episodic Reward")
+                plt.ylim(-3.5, 7)
+                plt.show(block=True)
+                plt.pause(10)
+                
             print("### SAC Training ended ###")
             print("Trained over {} steps".format(i))
 
@@ -395,5 +395,5 @@ class SAC(Base_model):
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
 
 if __name__ == "__main__":
-    car = SAC(model_name="custom_sac")
-    car.train()
+    car = SAC()
+    car.train(total_iterations=5)

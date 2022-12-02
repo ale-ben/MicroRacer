@@ -11,7 +11,7 @@ import tracks
 from Base_model import Base_model
 
 class PPO(Base_model):
-    def __init__(self, load_weights=True, model_name="PPO", weight_path="../weights"):
+    def __init__(self, load_weights=True, model_name="ppo", weight_path="../weights"):
         super().__init__()
 
         self.num_states = 5 
@@ -217,7 +217,7 @@ class PPO(Base_model):
                 reward+=t_r
         return (state, reward, done)
           
-    def train(self, total_iterations=600, load_weights=True, save_weights=True, save_name=None):
+    def train(self, total_iterations=600, load_weights=True, save_weights=True, save_name=None, plot_results=True):
         self.critic_model = self.Get_critic()
         self.critic_model(layers.Input(shape=(self.num_states)))
         self.actor_model(layers.Input(shape=(self.num_states)))
@@ -272,17 +272,20 @@ class PPO(Base_model):
                     self.weights_file_critic = f"{weight_path}/{save_name}_critic_model_car"
                 self.critic_model.save(self.weights_file_critic)
                 self.actor_model.save(self.weights_file_actor)
-            # Plotting Episodes versus Avg. Rewards
-            plt.plot(self.avg_reward_list)
-            plt.xlabel("Episode")
-            plt.ylabel("Avg. Episodic Reward")
-            plt.ylim(-3.5,7)
-            plt.show(block=True)
-            plt.pause(10)
+            if plot_results:
+                # Plotting Episodes versus Avg. Rewards
+                plt.plot(self.avg_reward_list)
+                plt.xlabel("Episode")
+                plt.ylabel("Avg. Episodic Reward")
+                plt.ylim(-3.5,7)
+                plt.show(block=True)
+                plt.pause(10)
+                
+            print("### PPO Training ended ###")
 
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))			
 
 if __name__ == "__main__":
-    car = PPO(weight_path="../weights/baseline_weights")
-    car.train(total_iterations=2)
+    car = PPO(load_weights=False)
+    car.train(total_iterations=5, load_weights=False)
