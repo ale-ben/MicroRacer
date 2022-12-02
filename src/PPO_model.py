@@ -8,132 +8,58 @@ from keras import backend as K
 import matplotlib.pyplot as plt
 import tracks
 
-num_states = 5 
-num_actions = 2 
+from Base_model import Base_model
 
-upper_bound = 1
-lower_bound = -1
-
-
-# Learning rate for actor-critic models
-critic_lr = 3e-4
-actor_lr = 3e-4
-
-# Number of episodes
-total_iterations = 600
-# Mini-batch size for training
-batch_size = 64
-# Number of training steps with the same episode
-epochs = 10
-
-gamma = 0.99
-gae_lambda = 0.95
-policy_clip = tf.constant(0.25, dtype=tf.float32)
-
-target_entropy = tf.constant(0.01, dtype=tf.float32)
-
-target_kl = 0.01
-
-is_training = True
-
-load_weights = False
-save_weights = True
-
-weights_file_actor = "weights/ppo_actor_model_car"
-weights_file_critic = "weights/ppo_critic_model_car"
-
-#The actor choose the move, given the state
-class Get_actor(tf.keras.Model):
+class PPO(Base_model):
     def __init__(self):
         super().__init__()
-        self.d1 = layers.Dense(64, activation="tanh")
-        self.d2 = layers.Dense(64, activation="tanh")
-        self.m = layers.Dense(num_actions, activation="tanh")
-        
-    def call(self, s):
-        out = self.d1(s)
-        out = self.d2(out)
-        mu = self.m(out)
-        sigma = 0.2
-        return  mu, sigma
-    
-    @property  
-    def trainable_variables(self):
-        return self.d1.trainable_variables + \
-                self.d2.trainable_variables + \
-                self.m.trainable_variables
+
+        self.num_states = 5 
+        self.num_actions = 2 
+
+        self.upper_bound = 1
+        self.lower_bound = -1
 
 
-#the critic compute the value, given the state 
-class Get_critic(tf.keras.Model):
-    def __init__(self):
-        super().__init__()
-        self.d1 = layers.Dense(64, activation="tanh")
-        self.d2 = layers.Dense(64, activation="tanh")
-        self.o = layers.Dense(1)
-        
-    def call(self, inputs):
-        out = self.d1(inputs)
-        out = self.d2(out)
-        q = self.o(out)
-        return q
-    
-    @property
-    def trainable_variables(self):
-        return self.d1.trainable_variables + \
-                self.d2.trainable_variables + \
-                self.o.trainable_variables
-    
+        # Learning rate for actor-critic models
+        self.critic_lr = 3e-4
+        self.actor_lr = 3e-4
 
-#trajectories buffer
-class Buffer:
-    def __init__(self, batch_size):
-        self.states=[]
-        self.actions=[]
-        self.rewards=[]
-        self.dones=[]
-        self.val=[]
-        self.logp=[]
-        self.batch_size = batch_size
+        # Number of episodes
+        self.total_iterations = 600
+        # Mini-batch size for training
+        self.batch_size = 64
+        # Number of training steps with the same episode
+        self.epochs = 10
 
-    def sample_batch(self):
-        n_states = len(self.states)
-        batch_start = np.arange(0, n_states, self.batch_size)
-        indices = np.arange(n_states, dtype=np.int64)
-        np.random.shuffle(indices)
-        batches = [indices[i:i+self.batch_size] for i in batch_start]
-        return np.array(self.states), np.array(self.actions), np.array(self.rewards),np.array(self.dones), np.array(self.val), np.array(self.logp), batches
-            
-    def record(self, state, action, reward, done, val, logp):
-        self.states.append(tf.squeeze(state))
-        self.actions.append(action)
-        self.rewards.append(reward)
-        self.dones.append(done)
-        self.val.append(tf.squeeze(val))
-        self.logp.append(tf.squeeze(logp))
-       
-    def clear(self):
-        self.states.clear()
-        self.actions.clear()
-        self.rewards.clear()
-        self.dones.clear() 
-        self.val.clear()
-        self.logp.clear()
-                   
-class Agent:
-    def __init__(self):
+        self.gamma = 0.99
+        self.gae_lambda = 0.95
+        self.policy_clip = tf.constant(0.25, dtype=tf.float32)
+
+        self.target_entropy = tf.constant(0.01, dtype=tf.float32)
+
+        self.target_kl = 0.01
+
+        self.is_training = False
+
+        self.load_weights = True
+        self.save_weights = False
+
+        self.weights_file_actor = "../weights/baseline_weights/ppo_actor_model_car"
+        self.weights_file_critic = "../weights/baseline_weights/ppo_critic_model_car"
+
         self.racer = tracks.Racer()
-        self.actor_model = Get_actor()
-        self.critic_model = Get_critic()
-        self.buffer = Buffer(batch_size)     
+        self.actor_model = self.Get_actor(self)
+        self.critic_model = self.Get_critic()
+        self.buffer = self.Buffer(self.batch_size)     
         ## TRAINING ##
-        self.critic_model(layers.Input(shape=(num_states)))
-        self.actor_model(layers.Input(shape=(num_states)))
-        if load_weights:
-            self.critic_model = keras.models.load_model(weights_file_critic)
-            self.actor_model = keras.models.load_model(weights_file_actor)
-        self.actor_optimizer = tf.keras.optimizers.Adam(actor_lr)
-        self.critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
+        self.critic_model(layers.Input(shape=(self.num_states)))
+        self.actor_model(layers.Input(shape=(self.num_states)))
+        if self.load_weights:
+            self.critic_model = keras.models.load_model(self.weights_file_critic)
+            self.actor_model = keras.models.load_model(self.weights_file_actor)
+        self.actor_optimizer = tf.keras.optimizers.Adam(self.actor_lr)
+        self.critic_optimizer = tf.keras.optimizers.Adam(self.critic_lr)
         self.actor_model.compile(optimizer=self.actor_optimizer)
         self.critic_model.compile(loss="mse",optimizer=self.critic_optimizer)
         # History of rewards per episode
@@ -141,7 +67,87 @@ class Agent:
         # Average reward history of last few episodes
         self.avg_reward_list = []
         # Keep track of how many training steps has been done
+
+
+
+    #The actor choose the move, given the state
+    class Get_actor(tf.keras.Model):
+        def __init__(self, model):
+            super().__init__()
+            self.d1 = layers.Dense(64, activation="tanh")
+            self.d2 = layers.Dense(64, activation="tanh")
+            self.m = layers.Dense(model.num_actions, activation="tanh")
+            
+        def call(self, s):
+            out = self.d1(s)
+            out = self.d2(out)
+            mu = self.m(out)
+            sigma = 0.2
+            return  mu, sigma
         
+        @property  
+        def trainable_variables(self):
+            return self.d1.trainable_variables + \
+                    self.d2.trainable_variables + \
+                    self.m.trainable_variables
+
+
+    #the critic compute the value, given the state 
+    class Get_critic(tf.keras.Model):
+        def __init__(self):
+            super().__init__()
+            self.d1 = layers.Dense(64, activation="tanh")
+            self.d2 = layers.Dense(64, activation="tanh")
+            self.o = layers.Dense(1)
+            
+        def call(self, inputs):
+            out = self.d1(inputs)
+            out = self.d2(out)
+            q = self.o(out)
+            return q
+        
+        @property
+        def trainable_variables(self):
+            return self.d1.trainable_variables + \
+                    self.d2.trainable_variables + \
+                    self.o.trainable_variables
+        
+
+    #trajectories buffer
+    class Buffer:
+        def __init__(self, batch_size):
+            self.states=[]
+            self.actions=[]
+            self.rewards=[]
+            self.dones=[]
+            self.val=[]
+            self.logp=[]
+            self.batch_size = batch_size
+
+        def sample_batch(self):
+            n_states = len(self.states)
+            batch_start = np.arange(0, n_states, self.batch_size)
+            indices = np.arange(n_states, dtype=np.int64)
+            np.random.shuffle(indices)
+            batches = [indices[i:i+self.batch_size] for i in batch_start]
+            return np.array(self.states), np.array(self.actions), np.array(self.rewards),np.array(self.dones), np.array(self.val), np.array(self.logp), batches
+                
+        def record(self, state, action, reward, done, val, logp):
+            self.states.append(tf.squeeze(state))
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.dones.append(done)
+            self.val.append(tf.squeeze(val))
+            self.logp.append(tf.squeeze(logp))
+        
+        def clear(self):
+            self.states.clear()
+            self.actions.clear()
+            self.rewards.clear()
+            self.dones.clear() 
+            self.val.clear()
+            self.logp.clear()
+
     #Returns an action sampled from the normal distribution returned by the actor and it's relative log probability.
     #If an action is passed returns it's log probability.
     def get_action_and_logp(self, states, actions=None):
@@ -267,18 +273,14 @@ class Agent:
             plt.ylim(-3.5,7)
             plt.show(block=False)
             plt.pause(0.001)
-        print("### PPO Training ended ###")
-            
+        print("### PPO Training ended ###")				
 
-    def launch(self):
-        if is_training:
-            start_t = datetime.now()
-            self.train()
-            end_t = datetime.now()
-            print("Time elapsed: {}".format(end_t-start_t))
-        tracks.newrun([self.actor_model])
+if __name__ == "__main__":
+    # if is_training:
+    # 	start_t = datetime.now()
+    # 	self.train()
+    # 	end_t = datetime.now()
+    # 	print("Time elapsed: {}".format(end_t-start_t))
 
-        
-        
-ppo_agent = Agent()
-ppo_agent.launch()
+    car = PPO()
+    tracks.newrun([car.actor_model])
