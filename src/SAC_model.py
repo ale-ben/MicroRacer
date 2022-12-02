@@ -215,8 +215,12 @@ class SAC(Base_model):
             q2 = self.critic2_model([states, actions])
             loss_c1 = tf.reduce_mean((q1 - q_hat) ** 2)
             loss_c2 = tf.reduce_mean((q2 - q_hat) ** 2)
-        critic1_gradient = tape1.gradient(loss_c1, self.critic_model.trainable_variables)
-        critic2_gradient = tape1.gradient(loss_c2, self.critic2_model.trainable_variables)
+        critic1_gradient = tape1.gradient(
+            loss_c1, self.critic_model.trainable_variables
+        )
+        critic2_gradient = tape1.gradient(
+            loss_c2, self.critic2_model.trainable_variables
+        )
         self.critic_model.optimizer.apply_gradients(
             zip(critic1_gradient, self.critic_model.trainable_variables)
         )
@@ -250,7 +254,14 @@ class SAC(Base_model):
         alpha_grad = tape.gradient(alpha_loss, [self.log_alpha])
         self.alpha_optimizer.apply_gradients(zip(alpha_grad, [self.log_alpha]))
 
-    def train(self, total_iterations=50000, load_weights=True, save_weights=True, save_name=None, plot_results=True):
+    def train(
+        self,
+        total_iterations=50000,
+        load_weights=True,
+        save_weights=True,
+        save_name=None,
+        plot_results=True,
+    ):
 
         self.critic_model = self.Get_critic()
         self.critic2_model = self.Get_critic()
@@ -343,9 +354,15 @@ class SAC(Base_model):
                     self.update_critics(states, actions, rewards, dones, newstates)
                     self.update_actor(states)
                     self.update_entropy(states)
-                    self.update_target(self.target_critic.variables, self.critic_model.variables, self.tau)
                     self.update_target(
-                        self.target_critic2.variables, self.critic2_model.variables, self.tau
+                        self.target_critic.variables,
+                        self.critic_model.variables,
+                        self.tau,
+                    )
+                    self.update_target(
+                        self.target_critic2.variables,
+                        self.critic2_model.variables,
+                        self.tau,
                     )
 
                 prev_state = state
@@ -372,9 +389,15 @@ class SAC(Base_model):
         if total_iterations > 0:
             if save_weights:
                 if save_name is not None:
-                    self.weights_file_actor = f"{weight_path}/{save_name}_actor_model_car"
-                    self.weights_file_critic = f"{weight_path}/{save_name}_critic_model_car"
-                    self.weights_file_critic2 = f"{weight_path}/{save_name}_critic2_model_car"
+                    self.weights_file_actor = (
+                        f"{weight_path}/{save_name}_actor_model_car"
+                    )
+                    self.weights_file_critic = (
+                        f"{weight_path}/{save_name}_critic_model_car"
+                    )
+                    self.weights_file_critic2 = (
+                        f"{weight_path}/{save_name}_critic2_model_car"
+                    )
                 self.critic_model.save(self.weights_file_critic)
                 self.critic2_model.save(self.weights_file_critic2)
                 self.actor_model.save(self.weights_file_actor)
@@ -387,12 +410,13 @@ class SAC(Base_model):
                 plt.ylim(-3.5, 7)
                 plt.show(block=True)
                 plt.pause(10)
-                
+
             print("### SAC Training ended ###")
             print("Trained over {} steps".format(i))
 
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
+
 
 if __name__ == "__main__":
     car = SAC()
