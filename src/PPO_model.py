@@ -42,19 +42,13 @@ class PPO(Base_model):
         self.weights_file_critic = f"{weight_path}/{model_name}_critic_model_car"
 
         self.racer = tracks.Racer()
-        self.actor_model = self.Get_actor(self)
-        self.critic_model = self.Get_critic()
-        self.buffer = self.Buffer(self.batch_size)     
-        ## TRAINING ##
-        self.critic_model(layers.Input(shape=(self.num_states)))
-        self.actor_model(layers.Input(shape=(self.num_states)))
+
+        self.actor_model = self.Get_actor(self)   
         if load_weights:
-            self.critic_model = keras.models.load_model(self.weights_file_critic)
             self.actor_model = keras.models.load_model(self.weights_file_actor)
-        self.actor_optimizer = tf.keras.optimizers.Adam(self.actor_lr)
-        self.critic_optimizer = tf.keras.optimizers.Adam(self.critic_lr)
-        self.actor_model.compile(optimizer=self.actor_optimizer)
-        self.critic_model.compile(loss="mse",optimizer=self.critic_optimizer)
+
+        self.buffer = self.Buffer(self.batch_size)  
+
         # History of rewards per episode
         self.ep_reward_list = []
         # Average reward history of last few episodes
@@ -148,7 +142,7 @@ class PPO(Base_model):
         dist = tfp.distributions.Normal(mu, sigma)
         if actions is None:
             # Use of the reparameterization trick 
-            actions = mu + sigma * tfp.distributions.Normal(0,1).sample(num_actions)   
+            actions = mu + sigma * tfp.distributions.Normal(0,1).sample(self.num_actions)   
         log_p = dist.log_prob(actions)
         
         if len(log_p.shape)>1:
@@ -157,7 +151,7 @@ class PPO(Base_model):
             log_p = tf.reduce_sum(log_p)
         log_p = tf.expand_dims(log_p, 1)
         
-        valid_action  = K.clip(actions, lower_bound, upper_bound)
+        valid_action  = K.clip(actions, self.lower_bound, self.upper_bound)
         
         return  valid_action, log_p
         
@@ -170,8 +164,8 @@ class PPO(Base_model):
                 nextvalue=lastvalue
             else:
                 nextvalue=values[i+1]
-            delta=rewards[i]+gamma*nextvalue*masks[i]-values[i]  
-            gae=delta+gamma*gae_lambda*masks[i]*gae
+            delta=rewards[i]+self.gamma*nextvalue*masks[i]-values[i]  
+            gae=delta+self.gamma*self.gae_lambda*masks[i]*gae
             returns.insert(0, gae+values[i])
         advantages = returns - values
         advantages = (advantages - tf.reduce_mean(advantages)) / (tf.math.reduce_std(advantages) + 1e-8)
@@ -187,14 +181,14 @@ class PPO(Base_model):
             adv_batch = tf.expand_dims(tf.convert_to_tensor(advantages.numpy()[batch], dtype=tf.float32),1)
             ret_batch =  tf.expand_dims(tf.convert_to_tensor(returns[batch], dtype=tf.float32),1)
             ologp_batch = tf.expand_dims(tf.convert_to_tensor(old_logp[batch], dtype=tf.float32),1)
-            for e in range(epochs):
+            for e in range(self.epochs):
                 with tf.GradientTape() as tape:
                     tape.watch(self.actor_model.trainable_variables)
                     _,logp_batch = self.get_action_and_logp(tf.stack(s_batch), tf.stack(a_batch)) 
                     ratio = tf.exp(logp_batch-ologp_batch)
                     weighted_ratio = ratio*adv_batch
-                    weighted_clipped_ratio = tf.clip_by_value(ratio, clip_value_min=1- policy_clip, clip_value_max=1+ policy_clip)*adv_batch
-                    min_wr = tf.minimum(weighted_ratio, weighted_clipped_ratio)- target_entropy*logp_batch
+                    weighted_clipped_ratio = tf.clip_by_value(ratio, clip_value_min=1- self.policy_clip, clip_value_max=1+ self.policy_clip)*adv_batch
+                    min_wr = tf.minimum(weighted_ratio, weighted_clipped_ratio)- self.target_entropy*logp_batch
                     loss = -tf.reduce_mean(min_wr)            
                 grad = tape.gradient(loss, self.actor_model.trainable_variables)    
                 self.actor_model.optimizer.apply_gradients(zip(grad, self.actor_model.trainable_variables))
@@ -204,7 +198,7 @@ class PPO(Base_model):
                 # We use approximatation of Kullback–Leibler divergence to early stop training epochs
                 _,logp = self.get_action_and_logp(s_batch, a_batch) 
                 kl = tf.reduce_mean(ologp_batch-logp)
-                if kl > 1.5*target_kl:
+                if kl > 1.5*self.target_kl:
                     print("early stopping - max kl reached at epoch {}".format(e))
                     break
 
@@ -224,8 +218,24 @@ class PPO(Base_model):
         return (state, reward, done)
           
     def train(self, total_iterations=600, load_weights=True, save_weights=True, save_name=None):
+        self.critic_model = self.Get_critic()
+        self.critic_model(layers.Input(shape=(self.num_states)))
+        self.actor_model(layers.Input(shape=(self.num_states)))
+
+        if load_weights:
+            self.critic_model = keras.models.load_model(self.weights_file_critic)
+        self.critic_optimizer = tf.keras.optimizers.Adam(self.critic_lr)
+        self.actor_optimizer = tf.keras.optimizers.Adam(self.actor_lr)
+
+        self.critic_model.compile(loss="mse",optimizer=self.critic_optimizer)
+        self.actor_model.compile(optimizer=self.actor_optimizer)
+
         i = 0
         mean_speed = 0
+
+        #### TRAINING ####
+        start_t = datetime.now()
+
         for ep in range(total_iterations):
             state = self.racer.reset()
             done = False
@@ -260,17 +270,19 @@ class PPO(Base_model):
                 if save_name is not None:
                     self.weights_file_actor = f"{weight_path}/{save_name}_actor_model_car"
                     self.weights_file_critic = f"{weight_path}/{save_name}_critic_model_car"
-                self.critic_model.save(weights_file_critic)
-                self.actor_model.save(weights_file_actor)
+                self.critic_model.save(self.weights_file_critic)
+                self.actor_model.save(self.weights_file_actor)
             # Plotting Episodes versus Avg. Rewards
             plt.plot(self.avg_reward_list)
             plt.xlabel("Episode")
             plt.ylabel("Avg. Episodic Reward")
             plt.ylim(-3.5,7)
-            plt.show(block=False)
+            plt.show(block=True)
             plt.pause(10)
-        print("### PPO Training ended ###")				
+
+        end_t = datetime.now()
+        print("Training completed.\nTime elapsed: {}".format(end_t - start_t))			
 
 if __name__ == "__main__":
     car = PPO(weight_path="../weights/baseline_weights")
-    car.train()
+    car.train(total_iterations=2)
