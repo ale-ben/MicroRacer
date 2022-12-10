@@ -12,6 +12,13 @@ from Base_model import Base_model
 
 class SAC(Base_model):
     def __init__(self, load_weights=True, model_name="sac", weight_path="../weights"):
+        """Constructor for the model
+
+        Args:
+            load_weights (bool, optional): If set to true loads weights for the model a weight file. Defaults to True.
+            model_name (str, optional): Name of the model (will be used to find weight paths). Defaults to "sac".
+            weight_path (str, optional): Base folder for weights. Defaults to "../weights".
+        """
         super().__init__()
 
         self.racer = tracks.Racer()
@@ -262,6 +269,15 @@ class SAC(Base_model):
         save_name=None,
         plot_results=True,
     ):
+        """Train the model and (optionally) save the weights.
+            To train an empty model set load_weights to false in model constructor.
+
+        Args:
+            total_iterations (int, optional): Number of iteration to run for training. Defaults to 600.
+            save_weights (bool, optional): If true save the weights to the specified path. WARNING: note that this overwrites previous weight files. Defaults to True.
+            save_name (_type_, optional): If set specifies a different name to save the weights, otherwise the model will use model_name. Defaults to None.
+            plot_results (bool, optional): If true plots a training graph at the end of training. NOTE: Set to false if running training on a CLI only machine. Defaults to True.
+        """
 
         self.critic_model = self.Get_critic()
         self.critic2_model = self.Get_critic()

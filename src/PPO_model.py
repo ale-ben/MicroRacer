@@ -13,25 +13,38 @@ from Base_model import Base_model
 
 class PPO(Base_model):
     def __init__(self, load_weights=True, model_name="ppo", weight_path="../weights"):
+        """Constructor for the model
+
+        Args:
+            load_weights (bool, optional): If set to true loads weights for the model a weight file. Defaults to True.
+            model_name (str, optional): Name of the model (will be used to find weight paths). Defaults to "ppo".
+            weight_path (str, optional): Base folder for weights. Defaults to "../weights".
+        """
         super().__init__()
         self.load_weights = load_weights
         self.weight_path = weight_path
         self.model_name = model_name
 
-        # Model parameters
+        # Model parameters
         self.num_actions = 2
 
         # Actor weights path
         self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
 
-        # Load the actor model
+        # Load the actor model
         self.actor_model = self.Get_actor(self)
         if load_weights:
             self.actor_model = keras.models.load_model(self.weights_file_actor)
 
-    # The actor choose the move, given the state
     class Get_actor(tf.keras.Model):
+        """The actor choose the move, given the state"""
+
         def __init__(self, model):
+            """Constructor for Get_actor
+
+            Args:
+                model: the instance of the model class
+            """
             super().__init__()
             self.d1 = layers.Dense(64, activation="tanh")
             self.d2 = layers.Dense(64, activation="tanh")
@@ -52,9 +65,11 @@ class PPO(Base_model):
                 + self.m.trainable_variables
             )
 
-    # the critic compute the value, given the state
     class Get_critic(tf.keras.Model):
+        """the critic compute the value, given the state"""
+
         def __init__(self):
+            """Constructor for Get_critic"""
             super().__init__()
             self.d1 = layers.Dense(64, activation="tanh")
             self.d2 = layers.Dense(64, activation="tanh")
@@ -74,8 +89,9 @@ class PPO(Base_model):
                 + self.o.trainable_variables
             )
 
-    # trajectories buffer
     class Buffer:
+        """trajectories buffer"""
+
         def __init__(self, batch_size):
             self.states = []
             self.actions = []
@@ -117,9 +133,17 @@ class PPO(Base_model):
             self.val.clear()
             self.logp.clear()
 
-    # Returns an action sampled from the normal distribution returned by the actor and it's relative log probability.
-    # If an action is passed returns it's log probability.
     def get_action_and_logp(self, states, actions=None):
+        """Returns an action sampled from the normal distribution returned by the actor and it's relative log probability.
+            If an action is passed returns it's log probability.
+
+        Args:
+            states (_type_): _description_
+            actions (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         mu, sigma = self.actor_model(states)
         dist = tfp.distributions.Normal(mu, sigma)
         if actions is None:
@@ -231,12 +255,19 @@ class PPO(Base_model):
         return (state, reward, done)
 
     def train(
-        self,
-        total_iterations=600,
-        save_weights=True,
-        save_name=None,
-        plot_results=True,
+        self, total_iterations=600, save_weights=True, save_name=None, plot_results=True
     ):
+        """Train the model and (optionally) save the weights.
+            To train an empty model set load_weights to false in model constructor.
+
+        Args:
+            total_iterations (int, optional): Number of iteration to run for training. Defaults to 600.
+            save_weights (bool, optional): If true save the weights to the specified path. WARNING: note that this overwrites previous weight files. Defaults to True.
+            save_name (_type_, optional): If set specifies a different name to save the weights, otherwise the model will use model_name. Defaults to None.
+            plot_results (bool, optional): If true plots a training graph at the end of training. NOTE: Set to false if running training on a CLI only machine. Defaults to True.
+        """
+
+        # Training parameters
         self.num_states = 5
         self.upper_bound = 1
         self.lower_bound = -1
@@ -267,6 +298,7 @@ class PPO(Base_model):
         self.avg_reward_list = []
         # Keep track of how many training steps has been done
 
+        # Models
         self.critic_model = self.Get_critic()
         self.critic_model(layers.Input(shape=(self.num_states)))
         self.actor_model(layers.Input(shape=(self.num_states)))
@@ -347,4 +379,4 @@ class PPO(Base_model):
 
 if __name__ == "__main__":
     car = PPO(load_weights=False)
-    car.train(total_iterations=5)
+    car.train()
