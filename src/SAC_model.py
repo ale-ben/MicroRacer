@@ -11,7 +11,7 @@ from Base_model import Base_model
 
 
 class SAC(Base_model):
-    def __init__(self, load_weights=True, model_name="sac", weight_path="../weights"):
+    def __init__(self, load_weights=True, model_name="sac", weight_path=None):
         """Constructor for the model
 
         Args:
@@ -37,6 +37,8 @@ class SAC(Base_model):
         self.num_states = 5  # we reduce the state dim through observation (see below)
         self.num_actions = 2  # acceleration and steering
 
+        if weight_path is None:
+            weight_path = f"./{model_name}/{model_name}_weights"
         self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
         self.weights_file_critic = f"{weight_path}/{model_name}_critic_model_car"
         self.weights_file_critic2 = f"{weight_path}/{model_name}_critic2_model_car"
@@ -65,6 +67,7 @@ class SAC(Base_model):
         # creating models
         self.actor_model = self.Get_actor(self)
 
+        self.load_weights = load_weights
         if load_weights:
             self.actor_model = keras.models.load_model(self.weights_file_actor)
 
@@ -264,7 +267,6 @@ class SAC(Base_model):
     def train(
         self,
         total_iterations=50000,
-        load_weights=True,
         save_weights=True,
         save_name=None,
         plot_results=True,
@@ -289,7 +291,7 @@ class SAC(Base_model):
         self.target_critic2.trainable = False
 
         ## TRAINING ##
-        if load_weights:
+        if self.load_weights:
             self.target_critic(
                 [
                     layers.Input(shape=(self.num_states)),
@@ -432,6 +434,9 @@ class SAC(Base_model):
 
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
+
+    def test(self):
+        tracks.newrun([self.get_actor_model()])
 
 
 if __name__ == "__main__":
