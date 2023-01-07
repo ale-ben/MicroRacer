@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "microracer"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.9.*"
+numpy = "^1.24.1"
+scipy = "^1.10.0"
+black = "^22.12.0"
+cython = "^0.29.33"
+matplotlib = "^3.6.2"
+tensorflow = "^2.11.0"
+tensorflow-probability = "^0.19.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
