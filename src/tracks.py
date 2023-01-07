@@ -575,17 +575,19 @@ def newrun(actors, obstacles=True, turn_limit=True, chicanes=True, low_speed_ter
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=counter, interval=5, blit=True, repeat=False)
     
     plt.show()
-    
+    scoreboard = []
     print("###SCOREBOARD###")
     for i, carn in enumerate(podium):
         print("{}° place : Car N.{}".format(i+1, carn+1))
     for i, racer in enumerate(racers):
+        scoreboard.append({"car":carn+1, "place":i+1, "completion":racer.completation})
         if racer.completation == 2:
             print("Car N.{} went off road".format(i+1))
         if racer.completation == 3:
             print("Carn N.{} went to the wrong direction".format(i+1))
         if racer.completation == 4:
             print("Carn N.{} went under speed limits".format(i+1))
+    return scoreboard
     
   
 # launches runs_num evaluations episodes with no plots and measures average steps and rewards   
