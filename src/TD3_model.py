@@ -37,7 +37,7 @@ class TD3(Base_model):
         self.actor_model = self.get_actor()
         self.load_weights = load_weights
         if load_weights:
-            self.actor_model = keras.models.load_model(weights_file_actor)
+            self.actor_model = keras.models.load_model(self.weights_file_actor)
 
     #The actor choose the move, given the state
     def get_actor(self):
@@ -236,9 +236,9 @@ class TD3(Base_model):
 
         ## TRAINING ##
         if self.load_weights:
-            self.target_actor(layers.Input(shape=(num_states)))
-            self.target_critic([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
-            self.target_critic2([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
+            self.target_actor(layers.Input(shape=(self.num_states)))
+            self.target_critic([layers.Input(shape=(self.num_states)),layers.Input(shape=(self.num_actions))])
+            self.target_critic2([layers.Input(shape=(self.num_states)),layers.Input(shape=(self.num_actions))])
             critic_model = keras.models.load_model(self.weights_file_critic)
             critic2_model = keras.models.load_model(self.weights_file_critic2)
 
@@ -292,7 +292,7 @@ class TD3(Base_model):
                 if buffer.buffer_counter>batch_size:
                     states,actions,rewards,dones,newstates= buffer.sample_batch()
                     newactions = self.policy_target(states)
-                    minQ = tf.math.minimum(target_critic([newstates,newactions]), target_critic2([newstates,newactions]))
+                    minQ = tf.math.minimum(self.target_critic([newstates,newactions]), self.target_critic2([newstates,newactions]))
                     targetQ = rewards + (1-dones)*gamma*(minQ)
 
                     loss1 = critic_model.train_on_batch([states,actions],targetQ)
@@ -343,6 +343,6 @@ class TD3(Base_model):
         tracks.newrun([self.get_actor_model()])
     
 if __name__ == "__main__":
-    car = TD3(load_weights=False)
-    car.train(total_iterations=5)
+    car = TD3()
+    car.train(total_iterations=50)
     car.test()

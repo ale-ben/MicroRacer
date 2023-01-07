@@ -384,5 +384,5 @@ class PPO(Base_model):
 
 if __name__ == "__main__":
     car = PPO()
-    #car.train(total_iterations=2)
+    car.train(total_iterations=1000)
     car.test()
