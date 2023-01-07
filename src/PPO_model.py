@@ -12,7 +12,7 @@ from Base_model import Base_model
 
 
 class PPO(Base_model):
-    def __init__(self, load_weights=True, model_name="ppo", weight_path="../weights"):
+    def __init__(self, load_weights=True, model_name="PPO", weight_path=None):
         """Constructor for the model
 
         Args:
@@ -22,14 +22,17 @@ class PPO(Base_model):
         """
         super().__init__(model_name)
         self.load_weights = load_weights
-        self.weight_path = weight_path
+        if weight_path is None:
+            self.weight_path = f"./{model_name}/{model_name}_weights"
+        else:
+            self.weight_path = weight_path
         self.model_name = model_name
 
         # Model parameters
         self.num_actions = 2
 
         # Actor weights path
-        self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
+        self.weights_file_actor = f"{self.weight_path}/{model_name}_actor_model_car"
 
         # Load the actor model
         self.actor_model = self.Get_actor(self)
@@ -379,4 +382,4 @@ class PPO(Base_model):
 
 if __name__ == "__main__":
     car = PPO(load_weights=False)
-    car.train()
+    car.train(total_iterations=2)
