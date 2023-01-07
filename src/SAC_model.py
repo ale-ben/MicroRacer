@@ -11,7 +11,7 @@ from Base_model import Base_model
 
 
 class SAC(Base_model):
-    def __init__(self, load_weights=True, model_name="sac", weight_path=None):
+    def __init__(self, load_weights=True, model_name="SAC", weight_path=None):
         """Constructor for the model
 
         Args:
