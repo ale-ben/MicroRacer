@@ -20,7 +20,7 @@ class PPO(Base_model):
             model_name (str, optional): Name of the model (will be used to find weight paths). Defaults to "ppo".
             weight_path (str, optional): Base folder for weights. Defaults to "../weights".
         """
-        super().__init__()
+        super().__init__(model_name)
         self.load_weights = load_weights
         self.weight_path = weight_path
         self.model_name = model_name

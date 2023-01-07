@@ -1,7 +1,8 @@
 {
-  "Python": {
-    "beautifiers": [
-      "Black"
-    ]
-  }
+	"Python": {
+	  "beautifiers": [
+		"Black",
+		"YAPF"
+	  ]
+	}
 }

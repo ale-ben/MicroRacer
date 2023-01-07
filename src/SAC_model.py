@@ -19,7 +19,7 @@ class SAC(Base_model):
             model_name (str, optional): Name of the model (will be used to find weight paths). Defaults to "sac".
             weight_path (str, optional): Base folder for weights. Defaults to "../weights".
         """
-        super().__init__()
+        super().__init__(model_name)
 
         self.racer = tracks.Racer()
 
