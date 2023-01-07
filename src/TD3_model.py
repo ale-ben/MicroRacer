@@ -12,7 +12,7 @@ from Base_model import Base_model
 racer = tracks.Racer()
 
 class TD3(Base_model):
-    def __init__(self, load_weights=True, model_name="td3", weight_path="../weights"):
+    def __init__(self, load_weights=True, model_name="TD3", weight_path=None):
         """Constructor for the model
 
         Args:
@@ -25,11 +25,19 @@ class TD3(Base_model):
         self.num_actions = 2 #acceleration and steering
         print("State Space dim: {}, Action Space dim: {}".format(self.num_states,self.num_actions))
 
+        if weight_path is None:
+            weight_path = f"./{model_name}/{model_name}_weights"
+
         # Actor weights path
         self.weights_file_actor = f"{weight_path}/{model_name}_actor_model_car"
+        self.weights_file_critic = f"{weight_path}/{model_name}_critic_model_car"
+        self.weights_file_critic2 = f"{weight_path}/{model_name}_critic2_model_car"
 
         #creating models
         self.actor_model = self.get_actor()
+        self.load_weights = load_weights
+        if load_weights:
+            self.actor_model = keras.models.load_model(weights_file_actor)
 
     #The actor choose the move, given the state
     def get_actor(self):
@@ -51,11 +59,11 @@ class TD3(Base_model):
 
 
     #the critic compute the q-value, given the state and the action
-    def get_critic():
+    def get_critic(self):
         # State as input
-        state_input = layers.Input(shape=(num_states))
+        state_input = layers.Input(shape=(self.num_states))
         # Action as input
-        action_input = layers.Input(shape=(num_actions))
+        action_input = layers.Input(shape=(self.num_actions))
 
         concat = layers.Concatenate()([state_input, action_input])
 
@@ -70,7 +78,7 @@ class TD3(Base_model):
 
     #Replay buffer
     class Buffer:
-        def __init__(self, buffer_capacity=100000, batch_size=64):
+        def __init__(self, model, buffer_capacity=100000, batch_size=64):
             # Max Number of tuples that can be stored
             self.buffer_capacity = buffer_capacity
             # Num of tuples used for training
@@ -80,11 +88,11 @@ class TD3(Base_model):
             self.buffer_counter = 0
 
             # We have a different array for each tuple element
-            self.state_buffer = np.zeros((self.buffer_capacity, num_states))
-            self.action_buffer = np.zeros((self.buffer_capacity, num_actions))
+            self.state_buffer = np.zeros((self.buffer_capacity, model.num_states))
+            self.action_buffer = np.zeros((self.buffer_capacity, model.num_actions))
             self.reward_buffer = np.zeros((self.buffer_capacity, 1))
             self.done_buffer = np.zeros((self.buffer_capacity, 1))
-            self.next_state_buffer = np.zeros((self.buffer_capacity, num_states))
+            self.next_state_buffer = np.zeros((self.buffer_capacity, model.num_states))
 
         # Stores a transition (s,a,r,s') in the buffer
         def record(self, obs_tuple):
@@ -122,10 +130,10 @@ class TD3(Base_model):
     def update_weights(target_weights, weights, tau):
         return(target_weights * (1- tau) +  weights * tau)
 
-    def policy(state,verbose=False):
+    def policy(self, state,verbose=False):
         #the policy used for training just add noise to the action
         #the amount of noise is kept constant during training
-        sampled_action = tf.squeeze(actor_model(state))
+        sampled_action = tf.squeeze(self.actor_model(state))
         noise = np.random.normal(scale=0.1,size=2)
         #we may change the amount of noise for actions during training
         noise[0] *= 2
@@ -138,32 +146,32 @@ class TD3(Base_model):
             print("decelerating")
 
         #Finally, we ensure actions are within bounds
-        legal_action = np.clip(sampled_action, lower_bound, upper_bound)
+        legal_action = np.clip(sampled_action, self.lower_bound, self.upper_bound)
 
         return [np.squeeze(legal_action)]
 
-    def policy_target(state,verbose=False):
+    def policy_target(self, state,verbose=False):
         #the policy used for training just add noise to the action
         #the amount of noise is kept constant during training
         newactions = []
-        sampled_action = tf.squeeze(target_actor(state))
+        sampled_action = tf.squeeze(self.target_actor(state))
         for a in sampled_action:
             noise = np.random.normal(scale=0.1,size=2)
             #we may change the amount of noise for actions during training
             noise[0] *= 2
             noise[1] *= .5
-            noise = np.clip(noise,-noise_clip, noise_clip)
+            noise = np.clip(noise,-self.noise_clip, self.noise_clip)
             # Adding noise to action
             a = a.numpy()
             a += noise
-            legal_action = np.clip(a, lower_bound, upper_bound)
+            legal_action = np.clip(a, self.lower_bound, self.upper_bound)
             legal_action = np.squeeze(legal_action)
             newactions.append(legal_action)
 
         return np.asarray(tf.squeeze(newactions))
 
-    def compose(actor,critic):
-        state_input = layers.Input(shape=(num_states))
+    def compose(self, actor, critic):
+        state_input = layers.Input(shape=(self.num_states))
         a = actor(state_input)
         q = critic([state_input,a])
         #reg_weights = actor.get_layer('out').get_weights()[0]
@@ -176,7 +184,7 @@ class TD3(Base_model):
 
 
     # We introduce a probability of doing n empty actions to separate the environment time-step from the agent   
-    def step(action):
+    def step(self, action):
         n = 1
         t = np.random.randint(0,n)
         state ,reward,done = racer.step(action)
@@ -193,7 +201,7 @@ class TD3(Base_model):
         ep = 0
         avg_reward = 0
 
-        noise_clip = 0.5
+        self.noise_clip = 0.5
         target_freq = 2
         # Discount factor
         gamma = 0.99
@@ -206,45 +214,41 @@ class TD3(Base_model):
         buffer_dim = 50000
         batch_size = 64
 
-        upper_bound = 1
-        lower_bound = -1
-        print("Min and Max Value of Action: {}".format(lower_bound,upper_bound))
+        self.upper_bound = 1
+        self.lower_bound = -1
+        print("Min and Max Value of Action: {}".format(self.lower_bound,self.upper_bound))
 
-        weights_file_critic = "weights/td3_critic_model_car"
-        weights_file_critic2 = "weights/td3_critic2_model_car"
-
-        critic_model = get_critic()
-        critic2_model = get_critic()
+        critic_model = self.get_critic()
+        critic2_model = self.get_critic()
         #actor_model.summary()
         #critic_model.summary()
 
-        buffer = Buffer(buffer_dim, batch_size)
+        buffer = self.Buffer(self, buffer_dim, batch_size)
         
         #we create the target model for double learning (to prevent a moving target phenomenon)
-        target_actor = get_actor()
-        target_critic = get_critic()
-        target_critic2 = get_critic()
-        target_actor.trainable = False
-        target_critic.trainable = False
-        target_critic2.trainable = False
-        aux_model = compose(actor_model,target_critic)
+        self.target_actor = self.get_actor()
+        self.target_critic = self.get_critic()
+        self.target_critic2 = self.get_critic()
+        self.target_actor.trainable = False
+        self.target_critic.trainable = False
+        self.target_critic2.trainable = False
+        aux_model = self.compose(self.actor_model,self.target_critic)
 
         ## TRAINING ##
-        if load_weights:
-            target_actor(layers.Input(shape=(num_states)))
-            target_critic([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
-            target_critic2([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
-            critic_model = keras.models.load_model(weights_file_critic)
-            critic2_model = keras.models.load_model(weights_file_critic2)
-            actor_model = keras.models.load_model(weights_file_actor)
+        if self.load_weights:
+            self.target_actor(layers.Input(shape=(num_states)))
+            self.target_critic([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
+            self.target_critic2([layers.Input(shape=(num_states)),layers.Input(shape=(num_actions))])
+            critic_model = keras.models.load_model(self.weights_file_critic)
+            critic2_model = keras.models.load_model(self.weights_file_critic2)
 
         # Making the weights equal initially
-        target_actor_weights = actor_model.get_weights()
-        target_critic_weights = critic_model.get_weights()
-        target_critic2_weights = critic2_model.get_weights()
-        target_actor.set_weights(target_actor_weights)
-        target_critic.set_weights(target_critic_weights)
-        target_critic2.set_weights(target_critic2_weights)
+        self.target_actor_weights = self.actor_model.get_weights()
+        self.target_critic_weights = critic_model.get_weights()
+        self.target_critic2_weights = critic2_model.get_weights()
+        self.target_actor.set_weights(self.target_actor_weights)
+        self.target_critic.set_weights(self.target_critic_weights)
+        self.target_critic2.set_weights(self.target_critic2_weights)
 
         critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
         aux_optimizer = tf.keras.optimizers.Adam(aux_lr)
@@ -273,9 +277,9 @@ class TD3(Base_model):
                 tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
                 #our policy is always noisy
-                action = policy(tf_prev_state)[0]
+                action = self.policy(tf_prev_state)[0]
                 # Get state and reward from the environment
-                state, reward, done = step(action)
+                state, reward, done = self.step(action)
                 #we distinguish between termination with failure (state = None) and succesfull termination on track completion
                 #succesfull termination is stored as a normal tuple
                 fail = done and len(state)<5 
@@ -287,7 +291,7 @@ class TD3(Base_model):
 
                 if buffer.buffer_counter>batch_size:
                     states,actions,rewards,dones,newstates= buffer.sample_batch()
-                    newactions = policy_target(states)
+                    newactions = self.policy_target(states)
                     minQ = tf.math.minimum(target_critic([newstates,newactions]), target_critic2([newstates,newactions]))
                     targetQ = rewards + (1-dones)*gamma*(minQ)
 
@@ -319,9 +323,9 @@ class TD3(Base_model):
 
         if total_iterations > 0:
             if save_weights:
-                critic_model.save(weights_file_critic)
-                critic2_model.save(weights_file_critic2)
-                actor_model.save(weights_file_actor) 
+                critic_model.save(self.weights_file_critic)
+                critic2_model.save(self.weights_file_critic2)
+                self.actor_model.save(self.weights_file_actor) 
             # Plotting Episodes versus Avg. Rewards
             plt.plot(avg_reward_list)
             plt.xlabel("Training steps x100")
@@ -340,5 +344,5 @@ class TD3(Base_model):
     
 if __name__ == "__main__":
     car = TD3(load_weights=False)
-    car.train()
+    car.train(total_iterations=5)
     car.test()

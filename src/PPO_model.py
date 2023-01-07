@@ -379,7 +379,10 @@ class PPO(Base_model):
         end_t = datetime.now()
         print("Training completed.\nTime elapsed: {}".format(end_t - start_t))
 
+    def test(self):
+        tracks.newrun([self.get_actor_model()])
 
 if __name__ == "__main__":
-    car = PPO(load_weights=False)
-    car.train(total_iterations=2)
+    car = PPO()
+    #car.train(total_iterations=2)
+    car.test()
