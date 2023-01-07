@@ -579,8 +579,10 @@ def newrun(actors, obstacles=True, turn_limit=True, chicanes=True, low_speed_ter
     print("###SCOREBOARD###")
     for i, carn in enumerate(podium):
         print("{}° place : Car N.{}".format(i+1, carn+1))
+        scoreboard.append({"car":carn+1, "place":i+1, "completion":1})
     for i, racer in enumerate(racers):
-        scoreboard.append({"car":carn+1, "place":i+1, "completion":racer.completation})
+        if racer.completation != 1:
+            scoreboard.append({"car":i, "place":-1, "completion":racer.completation})
         if racer.completation == 2:
             print("Car N.{} went off road".format(i+1))
         if racer.completation == 3:
