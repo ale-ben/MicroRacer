@@ -41,7 +41,6 @@ class PPO(Base_model):
 
     class Get_actor(tf.keras.Model):
         """The actor choose the move, given the state"""
-
         def __init__(self, model):
             """Constructor for Get_actor
 
@@ -62,15 +61,11 @@ class PPO(Base_model):
 
         @property
         def trainable_variables(self):
-            return (
-                self.d1.trainable_variables
-                + self.d2.trainable_variables
-                + self.m.trainable_variables
-            )
+            return (self.d1.trainable_variables + self.d2.trainable_variables +
+                    self.m.trainable_variables)
 
     class Get_critic(tf.keras.Model):
         """the critic compute the value, given the state"""
-
         def __init__(self):
             """Constructor for Get_critic"""
             super().__init__()
@@ -86,15 +81,11 @@ class PPO(Base_model):
 
         @property
         def trainable_variables(self):
-            return (
-                self.d1.trainable_variables
-                + self.d2.trainable_variables
-                + self.o.trainable_variables
-            )
+            return (self.d1.trainable_variables + self.d2.trainable_variables +
+                    self.o.trainable_variables)
 
     class Buffer:
         """trajectories buffer"""
-
         def __init__(self, batch_size):
             self.states = []
             self.actions = []
@@ -109,7 +100,7 @@ class PPO(Base_model):
             batch_start = np.arange(0, n_states, self.batch_size)
             indices = np.arange(n_states, dtype=np.int64)
             np.random.shuffle(indices)
-            batches = [indices[i : i + self.batch_size] for i in batch_start]
+            batches = [indices[i:i + self.batch_size] for i in batch_start]
             return (
                 np.array(self.states),
                 np.array(self.actions),
@@ -152,8 +143,7 @@ class PPO(Base_model):
         if actions is None:
             # Use of the reparameterization trick
             actions = mu + sigma * tfp.distributions.Normal(0, 1).sample(
-                self.num_actions
-            )
+                self.num_actions)
         log_p = dist.log_prob(actions)
 
         if len(log_p.shape) > 1:
@@ -179,8 +169,7 @@ class PPO(Base_model):
             returns.insert(0, gae + values[i])
         advantages = returns - values
         advantages = (advantages - tf.reduce_mean(advantages)) / (
-            tf.math.reduce_std(advantages) + 1e-8
-        )
+            tf.math.reduce_std(advantages) + 1e-8)
         return np.array(returns), advantages
 
     def update_networks(self, last_value=0):
@@ -199,39 +188,32 @@ class PPO(Base_model):
             s_batch = tf.convert_to_tensor(states[batch], dtype=tf.float32)
             a_batch = tf.convert_to_tensor(actions[batch], dtype=tf.float32)
             adv_batch = tf.expand_dims(
-                tf.convert_to_tensor(advantages.numpy()[batch], dtype=tf.float32), 1
-            )
+                tf.convert_to_tensor(advantages.numpy()[batch],
+                                     dtype=tf.float32), 1)
             ret_batch = tf.expand_dims(
-                tf.convert_to_tensor(returns[batch], dtype=tf.float32), 1
-            )
+                tf.convert_to_tensor(returns[batch], dtype=tf.float32), 1)
             ologp_batch = tf.expand_dims(
-                tf.convert_to_tensor(old_logp[batch], dtype=tf.float32), 1
-            )
+                tf.convert_to_tensor(old_logp[batch], dtype=tf.float32), 1)
             for e in range(self.epochs):
                 with tf.GradientTape() as tape:
                     tape.watch(self.actor_model.trainable_variables)
                     _, logp_batch = self.get_action_and_logp(
-                        tf.stack(s_batch), tf.stack(a_batch)
-                    )
+                        tf.stack(s_batch), tf.stack(a_batch))
                     ratio = tf.exp(logp_batch - ologp_batch)
                     weighted_ratio = ratio * adv_batch
-                    weighted_clipped_ratio = (
-                        tf.clip_by_value(
-                            ratio,
-                            clip_value_min=1 - self.policy_clip,
-                            clip_value_max=1 + self.policy_clip,
-                        )
-                        * adv_batch
-                    )
+                    weighted_clipped_ratio = (tf.clip_by_value(
+                        ratio,
+                        clip_value_min=1 - self.policy_clip,
+                        clip_value_max=1 + self.policy_clip,
+                    ) * adv_batch)
                     min_wr = (
-                        tf.minimum(weighted_ratio, weighted_clipped_ratio)
-                        - self.target_entropy * logp_batch
-                    )
+                        tf.minimum(weighted_ratio, weighted_clipped_ratio) -
+                        self.target_entropy * logp_batch)
                     loss = -tf.reduce_mean(min_wr)
-                grad = tape.gradient(loss, self.actor_model.trainable_variables)
+                grad = tape.gradient(loss,
+                                     self.actor_model.trainable_variables)
                 self.actor_model.optimizer.apply_gradients(
-                    zip(grad, self.actor_model.trainable_variables)
-                )
+                    zip(grad, self.actor_model.trainable_variables))
 
                 c_loss = self.critic_model.train_on_batch(s_batch, ret_batch)
 
@@ -239,7 +221,8 @@ class PPO(Base_model):
                 _, logp = self.get_action_and_logp(s_batch, a_batch)
                 kl = tf.reduce_mean(ologp_batch - logp)
                 if kl > 1.5 * self.target_kl:
-                    print("early stopping - max kl reached at epoch {}".format(e))
+                    print("early stopping - max kl reached at epoch {}".format(
+                        e))
                     break
 
         # We empty the buffer after policy update
@@ -257,9 +240,11 @@ class PPO(Base_model):
                 reward += t_r
         return (state, reward, done)
 
-    def train(
-        self, total_iterations=600, save_weights=True, save_name=None, plot_results=True
-    ):
+    def train(self,
+              total_iterations=600,
+              save_weights=True,
+              save_name=None,
+              plot_results=True):
         """Train the model and (optionally) save the weights.
             To train an empty model set load_weights to false in model constructor.
 
@@ -334,7 +319,8 @@ class PPO(Base_model):
                 # action = K.clip(action, lower_bound, upper_bound)
                 action = tf.squeeze(action)
                 nstate, reward, done = self.step(action)
-                self.buffer.record(state, action, reward, not done, value, logp)
+                self.buffer.record(state, action, reward, not done, value,
+                                   logp)
                 if not done:
                     mean_speed += nstate[4]
                 state = nstate
@@ -347,10 +333,8 @@ class PPO(Base_model):
             avg_reward = np.mean(self.ep_reward_list[-40:])
             # avg_reward = np.mean(self.ep_reward_list)
             print(
-                "Episode {}: Avg. Reward = {}, Last reward = {}. Avg. speed = {}".format(
-                    ep, avg_reward, episodic_reward, mean_speed / i
-                )
-            )
+                "Episode {}: Avg. Reward = {}, Last reward = {}. Avg. speed = {}"
+                .format(ep, avg_reward, episodic_reward, mean_speed / i))
             print("\n")
             self.avg_reward_list.append(avg_reward)
 
@@ -358,11 +342,9 @@ class PPO(Base_model):
             if save_weights:
                 if save_name is not None:
                     self.weights_file_actor = (
-                        f"{self.weight_path}/{save_name}_actor_model_car"
-                    )
+                        f"{self.weight_path}/{save_name}_actor_model_car")
                     weights_file_critic = (
-                        f"{self.weight_path}/{save_name}_critic_model_car"
-                    )
+                        f"{self.weight_path}/{save_name}_critic_model_car")
                 self.critic_model.save(weights_file_critic)
                 self.actor_model.save(self.weights_file_actor)
             if plot_results:
@@ -381,6 +363,7 @@ class PPO(Base_model):
 
     def test(self):
         tracks.newrun([self.get_actor_model()])
+
 
 if __name__ == "__main__":
     car = PPO()

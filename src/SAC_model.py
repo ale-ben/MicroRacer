@@ -49,15 +49,11 @@ class SAC(Base_model):
         self.buffer_dim = 50000
         self.batch_size = 64
 
-        print(
-            "State Space dim: {}, Action Space dim: {}".format(
-                self.num_states, self.num_actions
-            )
-        )
+        print("State Space dim: {}, Action Space dim: {}".format(
+            self.num_states, self.num_actions))
 
-        print(
-            "Min and Max Value of Action: {}".format(self.lower_bound, self.upper_bound)
-        )
+        print("Min and Max Value of Action: {}".format(self.lower_bound,
+                                                       self.upper_bound))
 
         # Adaptive Entropy to maximize exploration
         self.target_entropy = -tf.constant(self.num_actions, dtype=tf.float32)
@@ -91,15 +87,15 @@ class SAC(Base_model):
             dist = tfp.distributions.Normal(mu, sigma)
             # action = dist.sample()
             action = mu + sigma * tfp.distributions.Normal(0, 1).sample(
-                self.model.num_actions
-            )
+                self.model.num_actions)
             valid_action = tf.tanh(action)
 
             log_p = dist.log_prob(action)
             # correct log_p after the tanh squashing on action
             log_p = log_p - tf.reduce_sum(
-                tf.math.log(1 - valid_action**2 + 1e-16), axis=1, keepdims=True
-            )
+                tf.math.log(1 - valid_action**2 + 1e-16),
+                axis=1,
+                keepdims=True)
 
             if len(log_p.shape) > 1:
                 log_p = tf.reduce_sum(log_p, 1)
@@ -113,12 +109,8 @@ class SAC(Base_model):
 
         @property
         def trainable_variables(self):
-            return (
-                self.d1.trainable_variables
-                + self.d2.trainable_variables
-                + self.m.trainable_variables
-                + self.s.trainable_variables
-            )
+            return (self.d1.trainable_variables + self.d2.trainable_variables +
+                    self.m.trainable_variables + self.s.trainable_variables)
 
     # the critic compute the q-value, given the state and the action
     class Get_critic(tf.keras.Model):
@@ -138,11 +130,8 @@ class SAC(Base_model):
 
         @property
         def trainable_variables(self):
-            return (
-                self.d1.trainable_variables
-                + self.d2.trainable_variables
-                + self.o.trainable_variables
-            )
+            return (self.d1.trainable_variables + self.d2.trainable_variables +
+                    self.o.trainable_variables)
 
     # Replay buffer
     class Buffer:
@@ -156,11 +145,14 @@ class SAC(Base_model):
             self.buffer_counter = 0
 
             # We have a different array for each tuple element
-            self.state_buffer = np.zeros((self.buffer_capacity, model.num_states))
-            self.action_buffer = np.zeros((self.buffer_capacity, model.num_actions))
+            self.state_buffer = np.zeros(
+                (self.buffer_capacity, model.num_states))
+            self.action_buffer = np.zeros(
+                (self.buffer_capacity, model.num_actions))
             self.reward_buffer = np.zeros((self.buffer_capacity, 1))
             self.done_buffer = np.zeros((self.buffer_capacity, 1))
-            self.next_state_buffer = np.zeros((self.buffer_capacity, model.num_states))
+            self.next_state_buffer = np.zeros(
+                (self.buffer_capacity, model.num_states))
 
         # Stores a transition (s,a,r,s') in the buffer
         def record(self, obs_tuple):
@@ -223,20 +215,16 @@ class SAC(Base_model):
         with tf.GradientTape(persistent=True) as tape1:
             q1 = self.critic_model([states, actions])
             q2 = self.critic2_model([states, actions])
-            loss_c1 = tf.reduce_mean((q1 - q_hat) ** 2)
-            loss_c2 = tf.reduce_mean((q2 - q_hat) ** 2)
+            loss_c1 = tf.reduce_mean((q1 - q_hat)**2)
+            loss_c2 = tf.reduce_mean((q2 - q_hat)**2)
         critic1_gradient = tape1.gradient(
-            loss_c1, self.critic_model.trainable_variables
-        )
+            loss_c1, self.critic_model.trainable_variables)
         critic2_gradient = tape1.gradient(
-            loss_c2, self.critic2_model.trainable_variables
-        )
+            loss_c2, self.critic2_model.trainable_variables)
         self.critic_model.optimizer.apply_gradients(
-            zip(critic1_gradient, self.critic_model.trainable_variables)
-        )
+            zip(critic1_gradient, self.critic_model.trainable_variables))
         self.critic2_model.optimizer.apply_gradients(
-            zip(critic2_gradient, self.critic2_model.trainable_variables)
-        )
+            zip(critic2_gradient, self.critic2_model.trainable_variables))
 
     @tf.function
     def update_actor(self, states):
@@ -249,18 +237,18 @@ class SAC(Base_model):
             critic_v = tf.reduce_min([q1_n, q2_n], axis=0)
             actor_loss = critic_v - entropy_scale * log_probs
             actor_loss = -tf.reduce_mean(actor_loss)
-        actor_gradient = tape.gradient(actor_loss, self.actor_model.trainable_variables)
+        actor_gradient = tape.gradient(actor_loss,
+                                       self.actor_model.trainable_variables)
         self.actor_model.optimizer.apply_gradients(
-            zip(actor_gradient, self.actor_model.trainable_variables)
-        )
+            zip(actor_gradient, self.actor_model.trainable_variables))
 
     @tf.function
     def update_entropy(self, states):
         _, _, log_probs = self.actor_model(states)
         with tf.GradientTape() as tape:
             alpha_loss = tf.reduce_mean(
-                -self.alpha * tf.stop_gradient(log_probs + self.target_entropy)
-            )
+                -self.alpha *
+                tf.stop_gradient(log_probs + self.target_entropy))
         alpha_grad = tape.gradient(alpha_loss, [self.log_alpha])
         self.alpha_optimizer.apply_gradients(zip(alpha_grad, [self.log_alpha]))
 
@@ -292,20 +280,18 @@ class SAC(Base_model):
 
         ## TRAINING ##
         if self.load_weights:
-            self.target_critic(
-                [
-                    layers.Input(shape=(self.num_states)),
-                    layers.Input(shape=(self.num_actions)),
-                ]
-            )
-            self.target_critic2(
-                [
-                    layers.Input(shape=(self.num_states)),
-                    layers.Input(shape=(self.num_actions)),
-                ]
-            )
-            self.critic_model = keras.models.load_model(self.weights_file_critic)
-            self.critic2_model = keras.models.load_model(self.weights_file_critic2)
+            self.target_critic([
+                layers.Input(shape=(self.num_states)),
+                layers.Input(shape=(self.num_actions)),
+            ])
+            self.target_critic2([
+                layers.Input(shape=(self.num_states)),
+                layers.Input(shape=(self.num_actions)),
+            ])
+            self.critic_model = keras.models.load_model(
+                self.weights_file_critic)
+            self.critic2_model = keras.models.load_model(
+                self.weights_file_critic2)
 
         # Making the weights equal initially
         target_critic_weights = self.critic_model.get_weights()
@@ -346,7 +332,8 @@ class SAC(Base_model):
             while not (done):
                 i = i + 1
 
-                tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
+                tf_prev_state = tf.expand_dims(
+                    tf.convert_to_tensor(prev_state), 0)
                 _, action, _ = self.actor_model(tf_prev_state)
                 state, reward, done = self.step(action)
 
@@ -360,16 +347,21 @@ class SAC(Base_model):
                 episodic_reward += reward
 
                 if buffer.buffer_counter > self.batch_size:
-                    states, actions, rewards, dones, newstates = buffer.sample_batch()
-                    states = tf.stack(tf.convert_to_tensor(states, dtype=tf.float32))
-                    actions = tf.stack(tf.convert_to_tensor(actions, dtype=tf.float32))
-                    rewards = tf.stack(tf.convert_to_tensor(rewards, dtype=tf.float32))
-                    dones = tf.stack(tf.convert_to_tensor(dones, dtype=tf.float32))
-                    newstates = tf.stack(
-                        tf.convert_to_tensor(newstates, dtype=tf.float32)
+                    states, actions, rewards, dones, newstates = buffer.sample_batch(
                     )
+                    states = tf.stack(
+                        tf.convert_to_tensor(states, dtype=tf.float32))
+                    actions = tf.stack(
+                        tf.convert_to_tensor(actions, dtype=tf.float32))
+                    rewards = tf.stack(
+                        tf.convert_to_tensor(rewards, dtype=tf.float32))
+                    dones = tf.stack(
+                        tf.convert_to_tensor(dones, dtype=tf.float32))
+                    newstates = tf.stack(
+                        tf.convert_to_tensor(newstates, dtype=tf.float32))
 
-                    self.update_critics(states, actions, rewards, dones, newstates)
+                    self.update_critics(states, actions, rewards, dones,
+                                        newstates)
                     self.update_actor(states)
                     self.update_entropy(states)
                     self.update_target(
@@ -393,10 +385,8 @@ class SAC(Base_model):
             # Mean of last 40 episodes
             avg_reward = np.mean(ep_reward_list[-40:])
             print(
-                "Episode {}: Iterations {}, Avg. Reward = {}, Last reward = {}. Avg. speed = {}".format(
-                    ep, i, avg_reward, episodic_reward, mean_speed / i
-                )
-            )
+                "Episode {}: Iterations {}, Avg. Reward = {}, Last reward = {}. Avg. speed = {}"
+                .format(ep, i, avg_reward, episodic_reward, mean_speed / i))
             print("\n")
 
             if ep > 0 and ep % 40 == 0:
@@ -408,14 +398,11 @@ class SAC(Base_model):
             if save_weights:
                 if save_name is not None:
                     self.weights_file_actor = (
-                        f"{weight_path}/{save_name}_actor_model_car"
-                    )
+                        f"{weight_path}/{save_name}_actor_model_car")
                     self.weights_file_critic = (
-                        f"{weight_path}/{save_name}_critic_model_car"
-                    )
+                        f"{weight_path}/{save_name}_critic_model_car")
                     self.weights_file_critic2 = (
-                        f"{weight_path}/{save_name}_critic2_model_car"
-                    )
+                        f"{weight_path}/{save_name}_critic2_model_car")
                 self.critic_model.save(self.weights_file_critic)
                 self.critic2_model.save(self.weights_file_critic2)
                 self.actor_model.save(self.weights_file_actor)
