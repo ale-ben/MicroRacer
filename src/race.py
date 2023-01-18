@@ -13,12 +13,12 @@ completion_codes = [
     "", "finished", "off track", "wrong direction", "under speed limit"
 ]
 
-for i, car in enumerate(scoreboard):
+for car in scoreboard:
     if car["completion"] == 1:
         print(
-            f"car {i} ({cars[i].get_name()}) finished in {car['place']} position."
+            f"car {car['car']} ({cars[car['car']-1].get_name()}) finished in {car['place']} position."
         )
     else:
         print(
-            f"car {i} ({cars[i].get_name()}) did not finish with completion code {car['completion']} ({completion_codes[car['completion']]})."
+            f"car {car['car']} ({cars[car['car']-1].get_name()}) did not finish with completion code {car['completion']} ({completion_codes[car['completion']]})."
         )
